@@ -1,0 +1,8 @@
+[Unit]
+Description=Cloudflare TLSA Sync
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/cloudflare_tlsa_json.sh -c /etc/cloudflare_tlsa_sync/config.json
+#User=<nicht-root-user>
+#Group=<nicht-root-user>

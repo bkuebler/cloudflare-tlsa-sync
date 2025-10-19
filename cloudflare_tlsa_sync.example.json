@@ -1,0 +1,30 @@
+{
+  "cf_api_token": "YOUR_API_TOKEN",
+  "alert_hooks": [
+    "alert-mail.sh",
+    "alert-slack.sh"
+  ],
+  "domains": [
+    {
+      "domain": "example.com",
+      "records": [
+        {
+          "host": "mail",
+          "ports": [25, 587],
+          "ttl": 600,
+          "certificate_file": "/etc/ssl/certs/mail.pem"
+        }
+      ]
+    },
+    {
+      "domain": "myotherdomain.de",
+      "records": [
+        {
+          "host": "mx",
+          "ports": [25],
+          "certificate_file": "/etc/ssl/certs/mx.pem"
+        }
+      ]
+    }
+  ]
+}
