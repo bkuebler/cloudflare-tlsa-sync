@@ -220,7 +220,7 @@ for ((d=0; d<DOMAINS_N; ++d)); do
               -H "Authorization: Bearer $CF_API_TOKEN" \
               -H "Content-Type: application/json" | $JQ -r '.result[0].id')
 
-            POST_DATA="{\"type\": \"TLSA\", \"name\": \"$RECORD_NAME\", \"content\": \"$RECORD_CONTENT\", \"ttl\": $TTL, \"proxied\": false}"
+            POST_DATA="{\"type\": \"TLSA\", \"name\": \"$RECORD_NAME\", \"data\": { \"usage\": 3, \"selector\": 1, \"matching_type\": 1, \"certificate\": \"$RECORD_HASH\"}, \"ttl\": $TTL, \"proxied\": false}"
 
             if [[ "$RECORD_ID" != "null" && "$RECORD_ID" != "" ]]; then
                 # TODOFIX: Check if content is the same, then skip

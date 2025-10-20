@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameters placed.
 - Required command list were not correctly verified. Output of missing installed package were not provided.
 - Hash generation for TLSA record type '3 1 1' was wrong. This was now corrected. And works as expected.
+- Stupid Cloudflare API documentation is incorrect, missing mandatory fields corrected.
 
 ## [1.0.0] - 2025-10-19
 
