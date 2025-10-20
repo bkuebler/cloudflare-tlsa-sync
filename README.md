@@ -50,6 +50,33 @@ Show help at any time with:
 
 `cloudflare_tlsa_sync.json` defines your domains, hosts, ports, certificate files and (optionally) any number of alert hooks or the ttl value for the TLSA entry from the given domain. See the example config provided in this repository.
 
+### Entry Configuration Object
+
+| Parameter      | Type          | Description                                                  | Mandatory | Beispiel                              |
+| -------------- | ------------- | -------------------------------------------------------------| --------- | ------------------------------------- |
+| `cf_api_token` | String        | Cloudflare API Token with DNS Zone edit rights               | ✅        | `"cf_api_token": "YOUR_API_TOKEN"`    |
+| `alert_hooks`  | Array[String] | A list of hook scripts, which will be executed on failures   | ❌        | `["alert-mail.sh", "alert-slack.sh"]` |
+| `domains`      | Array[Object] | A list with the domains to maintain TLSA records             | ✅        | see below                             |
+
+#### Domain Object
+
+| Parameter | Type          | Description                                                     | Mandatory | Example         |
+| --------- | ------------- | --------------------------------------------------------------- | --------- | --------------- |
+| `domain`  | String        | The TLD domain name / zone for you want to define the records   | ✅        | `"example.com"` |
+| `records` | Array[Object] | A list of DNS-/TLS-Records for the zone to maintain             | ✅        | see below n     |
+
+#### Record Object
+
+| Parameter          | Type           | Description                                                                           | Mandatory | Example                     |
+| ------------------ | -------------- | ------------------------------------------------------------------------------------- | --------- | --------------------------- |
+| `host`             | String         | Hostname of the DNS-Record (`mail` or `mx`). Used for FQDN creation (`host.domain`)   | ✅        | `"mail"`                    |
+| `ports`            | Array[Integer] | A list of TCP-Ports, which should get a TLSA record (SMTP 25, Submission 587)         | ✅        | `[25, 587]`                 |
+| `ttl`              | Integer        | The TTL value which the record should get (default 3600 if unset)                     | ❌        | `7200`                      |
+| `verify_type`      | String         | TLSA verification type `TLS`(default if unset),`STARTTLS:{STARTTLSTYPE}`,`NONE`       | ❌        | `"STARTTLS:smtp"`           |
+| `certificate_file` | String         | Location of your certificate file, a fullchain file works as well                     | ✅        | `"/etc/ssl/certs/mail.pem"` |
+
+For `STARTTLSTYPE` see available values in your openssl command `openssl s_client -starttls -help`.
+
 ## Alert Hooks
 
 The `alert_hooks` array in the config may contain any number of executable scripts triggered on various error (or event) conditions, each receiving parameters with error type and details. Example hook templates for e-mail, Slack, Matrix, Telegram, Icinga2 REST, and Google Chat are provided.

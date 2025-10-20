@@ -22,6 +22,7 @@
         {
           "host": "mx",
           "ports": [25],
+          "verify_type": "STARTTLS:smtp",
           "certificate_file": "/etc/ssl/certs/mx.pem"
         }
       ]
