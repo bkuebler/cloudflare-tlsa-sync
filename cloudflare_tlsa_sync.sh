@@ -20,6 +20,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEFAULT_CONFIG="$SCRIPT_DIR/cloudflare_tlsa_sync.json"
 CONFIG=""
 DRY_RUN="no"
+COMMANDS="jq curl openssl xxd"
 
 function show_help() {
     cat <<EOF
@@ -38,7 +39,7 @@ Examples:
 EOF
 }
 
-while getopts ":t:c:h" opt; do
+while getopts "tc:h" opt; do
     case $opt in
         c)
             CONFIG="$OPTARG"
@@ -79,14 +80,12 @@ else
     HOOKS_DIR="$(dirname "$CONFIG")/hooks"
 fi
 
-JQ=$(command -v jq)
-CURL=$(command -v curl)
-OPENSSL=$(command -v openssl)
-XXD=$(command -v xxd)
-
 # check dependencies
-for cmd in "$JQ" "$CURL" "$OPENSSL" "$XXD"; do
-    if [[ -z "$cmd" ]]; then
+for cmd in $COMMANDS; do
+    # we want all commands as uppercase variables
+    CMD_VAR=${cmd^^}
+    eval "$CMD_VAR"="$(command -v "$cmd" || true)"
+    if [[ -z "${!CMD_VAR}" ]]; then
         echo "Required command not found: $cmd"
         exit 1
     fi
@@ -127,6 +126,22 @@ function alert_hooks() {
     fi
 }
 
+# TLSA record verification call
+function tlsa_verify() {
+    # verify cmd is allowed to fail we check on exit code
+    set +e
+    VERIFYCMD=$($OPENSSL s_client -brief "${OPENSSL_CONNECT_PARAMS[@]}" -dane_tlsa_domain "${HOST}.${DOMAIN}" -dane_tlsa_rrdata "$RECORD_CONTENT" -connect "${HOST}.${DOMAIN}:${PORT}" <<< "Q" 2>&1 | grep -q 'DANE TLSA 3 1 1.*matched the EE certificate'; echo $?)
+    set -e
+    if [[ $VERIFYCMD -eq 0 ]]; then
+        log "TLSA record verification for $HOST.$DOMAIN:$PORT successful."
+        return 0
+    else
+        log_error "TLSA record verification for $HOST.$DOMAIN:$PORT failed. TLSA adjustments not done."
+        alert_hooks "TLSA_FAIL" "$RECORD_NAME" "New content '$RECORD_CONTENT' for record failed to verify / missmatch current endpoint cert."
+        return 1
+    fi
+}
+
 CF_API_TOKEN=$(jq -r '.cf_api_token' "$CONFIG")
 CF_API_BASE="https://api.cloudflare.com/client/v4"
 
@@ -164,12 +179,41 @@ for ((d=0; d<DOMAINS_N; ++d)); do
             log "TTL for $HOST.$DOMAIN not found, using default 3600"
             TTL=3600
         fi
+        VERIFY_TYPE_STRING=$(jq -r ".domains[$d].records[$r].verify_type" "$CONFIG")
+        VERIFY_TYPE="${VERIFY_TYPE_STRING%%:*}"
+        STARTTLS_TYPE="${VERIFY_TYPE_STRING##*:}"
+        if [[ -z "$VERIFY_TYPE" || "$VERIFY_TYPE" == "null" ]]; then
+            log "VERIFY_TYPE unset will use TLS"
+            VERIFY_TYPE='TLS'
+        fi
         for PORT in $PORTS; do
             RECORD_NAME="_${PORT}._tcp.$HOST.$DOMAIN"
             # TLSA-Hash calculate ("3 1 1")
-            RECORD_HASH=$($OPENSSL x509 -in "$CERTFILE" -outform DER | $OPENSSL dgst -sha256 -binary | $XXD -p -c 256)
+            RECORD_HASH=$($OPENSSL x509 -in "$CERTFILE" -pubkey -noout -outform DER | $OPENSSL ec -pubin -outform der 2>/dev/null | $OPENSSL dgst -sha256 -binary | $XXD -p -c 256)
             RECORD_CONTENT="3 1 1 $RECORD_HASH"
             log "TLSA for $RECORD_NAME: $RECORD_CONTENT"
+
+            # start verify the TLSA record content with current running service
+            case $VERIFY_TYPE in
+                STARTTLS)
+                    OPENSSL_CONNECT_PARAMS=("-starttls" "$STARTTLS_TYPE")
+                    log "TLSA record verification with STARTTLS ($STARTTLS_TYPE) started"
+                    tlsa_verify || true
+                    VERIFY_RESULT=$?
+                    ;;
+                TLS)
+                    OPENSSL_CONNECT_PARAMS=()
+                    log "TLSA record verification with TLS started"
+                    tlsa_verify || true
+                    VERIFY_RESULT=$?
+                    ;;
+                *)
+                    log "TLSA record verification disabled for $RECORD_NAME"
+                    ;;
+            esac
+            if [[ $VERIFY_RESULT -ne 0 ]]; then
+                continue
+            fi
 
             # Check if record exists
             RECORD_ID=$($CURL -s -X GET "$CF_API_BASE/zones/$ZONE_ID/dns_records?type=TLSA&name=$RECORD_NAME" \
