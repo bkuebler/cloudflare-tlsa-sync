@@ -14,7 +14,7 @@
 # hard fail on errors
 set -e
 
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.1.0"
 SCRIPT_NAME="$(basename "$0")"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DEFAULT_CONFIG="$SCRIPT_DIR/cloudflare_tlsa_sync.json"
